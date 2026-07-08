@@ -9,7 +9,12 @@ const PACKAGE_LIVE_VIDEO_CANDIDATES = [
   'assets/videos/hailin-live.mp4',
   '../../assets/videos/hailin-live.mp4'
 ];
-const USER_LIVE_VIDEO = `${wx.env.USER_DATA_PATH}/hailin-live.mp4`;
+const USER_LIVE_VIDEO = typeof wx !== 'undefined' && wx && wx.env && wx.env.USER_DATA_PATH ? `${wx.env.USER_DATA_PATH}/hailin-live.mp4` : '';
+const VIDEO_SOURCE_CANDIDATES = [
+  USER_LIVE_VIDEO,
+  PACKAGE_LIVE_VIDEO,
+  PACKAGE_LIVE_VIDEO_FALLBACK
+].filter(Boolean);
 
 Page({
   data: {
@@ -20,6 +25,7 @@ Page({
   },
 
   onLoad(options) {
+    this.videoSourceIndex = -1;
     this.refreshClock();
     this.clockTimer = setInterval(() => {
       this.refreshClock();
@@ -55,11 +61,16 @@ Page({
 
   prepareLocalVideo() {
     const fs = wx.getFileSystemManager();
+    if (!USER_LIVE_VIDEO) {
+      this.useVideoSource(PACKAGE_LIVE_VIDEO);
+      return;
+    }
+
     fs.stat({
       filePath: USER_LIVE_VIDEO,
       success: (res) => {
         if (res.stats && res.stats.size > 1024) {
-          this.setData({ videoUrl: USER_LIVE_VIDEO });
+          this.useVideoSource(USER_LIVE_VIDEO);
           return;
         }
         this.copyPackageVideo(fs);
@@ -76,17 +87,37 @@ Page({
         filePath: USER_LIVE_VIDEO,
         data,
         success: () => {
-          this.setData({ videoUrl: USER_LIVE_VIDEO });
+          this.useVideoSource(USER_LIVE_VIDEO);
         },
         fail: (error) => {
           console.warn('write live video failed', error);
-          this.setData({ videoUrl: PACKAGE_LIVE_VIDEO_FALLBACK });
+          this.useVideoSource(PACKAGE_LIVE_VIDEO);
         }
       });
     }, (error) => {
       console.warn('read package live video failed', error);
-      this.setData({ videoUrl: PACKAGE_LIVE_VIDEO_FALLBACK });
+      this.useVideoSource(PACKAGE_LIVE_VIDEO);
     });
+  },
+
+  useVideoSource(source) {
+    this.videoSourceIndex = Math.max(0, VIDEO_SOURCE_CANDIDATES.indexOf(source));
+    this.setData({ videoUrl: source });
+  },
+
+  tryNextVideoSource() {
+    const currentIndex = VIDEO_SOURCE_CANDIDATES.indexOf(this.data.videoUrl);
+    const nextIndex = Math.max(this.videoSourceIndex || 0, currentIndex) + 1;
+    const nextSource = VIDEO_SOURCE_CANDIDATES[nextIndex];
+    if (nextSource) {
+      this.videoSourceIndex = nextIndex;
+      this.setData({ videoUrl: nextSource });
+      quickToast('正在切换备用视频源');
+      return;
+    }
+    this.videoSourceIndex = VIDEO_SOURCE_CANDIDATES.length;
+    this.setData({ videoUrl: '' });
+    quickToast('视频暂不可播放，已切换为封面预览');
   },
 
   readPackageVideo(fs, index, onSuccess, onFail, lastError) {
@@ -117,7 +148,7 @@ Page({
 
   onVideoError(event) {
     console.warn('live video error', event.detail);
-    quickToast('视频加载失败，请重新编译或检查视频格式');
+    this.tryNextVideoSource();
   }
 
   // 真实直播密钥、萤石云 token 或 HLS 鉴权应由后端维护。

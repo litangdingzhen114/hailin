@@ -1,7 +1,43 @@
 const serviceConfig = require('../config/service');
 
+const API_BASE_OVERRIDE_KEY = 'hailin-api-base-url';
+
+function safeWxCall(methodName, fallback) {
+  try {
+    if (typeof wx === 'undefined' || !wx || typeof wx[methodName] !== 'function') {
+      return fallback;
+    }
+    return wx[methodName]();
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function isDevtools() {
+  const info = safeWxCall('getSystemInfoSync', {});
+  return info && info.platform === 'devtools';
+}
+
+function storageApiBaseUrl() {
+  try {
+    if (typeof wx === 'undefined' || !wx || typeof wx.getStorageSync !== 'function') {
+      return '';
+    }
+    return String(wx.getStorageSync(API_BASE_OVERRIDE_KEY) || '').trim();
+  } catch (error) {
+    return '';
+  }
+}
+
+function resolveApiBaseUrl() {
+  const overrideUrl = storageApiBaseUrl();
+  if (overrideUrl) return overrideUrl;
+  if (isDevtools() && serviceConfig.devApiBaseUrl) return serviceConfig.devApiBaseUrl;
+  return serviceConfig.apiBaseUrl || '';
+}
+
 function hasBackend() {
-  return Boolean(serviceConfig.apiBaseUrl && serviceConfig.apiBaseUrl.trim());
+  return Boolean(resolveApiBaseUrl().trim());
 }
 
 function joinUrl(baseUrl, endpoint) {
@@ -24,7 +60,7 @@ function request(endpoint, options = {}) {
 
   const method = options.method || 'GET';
   const data = options.data || {};
-  const url = joinUrl(serviceConfig.apiBaseUrl, endpoint);
+  const url = joinUrl(resolveApiBaseUrl(), endpoint);
 
   return new Promise((resolve, reject) => {
     wx.request({
@@ -50,11 +86,14 @@ function request(endpoint, options = {}) {
 }
 
 function serviceModeText() {
-  return hasBackend() ? '真实服务已连接' : '本地内容兜底';
+  const baseUrl = resolveApiBaseUrl();
+  if (!baseUrl) return '本地内容兜底';
+  return baseUrl === serviceConfig.devApiBaseUrl ? '本地后端已连接' : '真实服务已连接';
 }
 
 module.exports = {
   hasBackend,
+  resolveApiBaseUrl,
   request,
   serviceModeText,
   serviceConfig

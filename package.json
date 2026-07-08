@@ -12,7 +12,9 @@
     "test:admin-ops": "node backend/test-admin-ops.js",
     "test:production": "node backend/test-production.js",
     "test:security": "node backend/test-security.js",
-    "test": "node backend/test-kimi.js && node backend/test-vercel-adapter.js && node backend/test-production.js && node backend/test-security.js && node backend/test-admin-ops.js && node miniprogram/tests/mine-page.test.js && node miniprogram/tests/map-page.test.js"
+    "test:api": "node miniprogram/tests/api-service.test.js",
+    "test:live": "node miniprogram/tests/live-detail.test.js",
+    "test": "node backend/test-kimi.js && node backend/test-vercel-adapter.js && node backend/test-production.js && node backend/test-security.js && node backend/test-admin-ops.js && node miniprogram/tests/mine-page.test.js && node miniprogram/tests/map-page.test.js && node miniprogram/tests/api-service.test.js && node miniprogram/tests/live-detail.test.js"
   },
   "engines": {
     "node": ">=18"
