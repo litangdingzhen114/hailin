@@ -62,6 +62,8 @@ async function main() {
   assert(adminHtml.includes('exportBackup'), 'admin dashboard should expose one-click backup');
   assert(adminJs.includes('/api/admin/audit'), 'admin dashboard should load audit trail');
   assert(adminJs.includes('/api/admin/backup'), 'admin dashboard should download JSON backup');
+  assert(adminHtml.includes('homeContentEditor'), 'admin dashboard should render home content editor');
+  assert(adminJs.includes('/api/admin/home-content'), 'admin dashboard should manage home content');
   assert(adminJs.includes('maskContact'), 'admin dashboard should mask contact info in tables');
 
   const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hailin-admin-ops-test-'));
@@ -111,6 +113,37 @@ async function main() {
     assert.strictEqual(unauthorizedAudit.status, 401);
 
     const authHeaders = { Authorization: `Bearer ${ADMIN_TOKEN}` };
+    const homeContent = await requestJson(`http://${HOST}:${PORT}/api/admin/home-content`, {
+      headers: authHeaders
+    });
+    assert.strictEqual(homeContent.status, 200);
+    assert(Array.isArray(homeContent.body.data.content.banners));
+    assert(homeContent.body.data.content.banners.length > 0);
+    assert.strictEqual(homeContent.body.data.meta.source, 'defaults');
+
+    const editedHome = {
+      ...homeContent.body.data.content,
+      notice: 'Admin edited home notice',
+      weather: 'Admin edited weather',
+      banners: homeContent.body.data.content.banners.map((item, index) => (
+        index === 0 ? { ...item, title: 'Admin edited banner' } : item
+      ))
+    };
+    const savedHome = await requestJson(`http://${HOST}:${PORT}/api/admin/home-content`, {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({ content: editedHome })
+    });
+    assert.strictEqual(savedHome.status, 200);
+    assert.strictEqual(savedHome.body.data.content.notice, 'Admin edited home notice');
+    assert.strictEqual(savedHome.body.data.meta.source, 'storage');
+
+    const publicHome = await requestJson(`http://${HOST}:${PORT}/api/hailin/home`);
+    assert.strictEqual(publicHome.status, 200);
+    assert.strictEqual(publicHome.body.data.notice, 'Admin edited home notice');
+    assert.strictEqual(publicHome.body.data.weather, 'Admin edited weather');
+    assert.strictEqual(publicHome.body.data.banners[0].title, 'Admin edited banner');
+
     const updated = await requestJson(`http://${HOST}:${PORT}/api/admin/bookings/${booking.body.data.id}/status`, {
       method: 'PATCH',
       headers: authHeaders,
@@ -123,6 +156,7 @@ async function main() {
     });
     assert.strictEqual(audit.status, 200);
     assert(audit.body.data.items.some((item) => item.action === 'booking.status.updated'), 'status update should be audited');
+    assert(audit.body.data.items.some((item) => item.action === 'home-content.updated'), 'home content update should be audited');
     assert(audit.body.data.items.some((item) => item.action === 'booking.created'), 'public booking creation should be audited');
     assert(audit.body.data.items.some((item) => item.action === 'feedback.created'), 'public feedback creation should be audited');
     const statusAudit = audit.body.data.items.find((item) => item.action === 'booking.status.updated');
@@ -140,7 +174,19 @@ async function main() {
     assert.strictEqual(backup.meta.service, 'hailin-backend');
     assert.strictEqual(backup.data.bookings.length, 1);
     assert.strictEqual(backup.data.feedback.length, 1);
+    assert.strictEqual(backup.data.homeContent.content.notice, 'Admin edited home notice');
     assert(backup.data.audit.length >= 3);
+
+    const resetHome = await requestJson(`http://${HOST}:${PORT}/api/admin/home-content/reset`, {
+      method: 'POST',
+      headers: authHeaders
+    });
+    assert.strictEqual(resetHome.status, 200);
+    assert.strictEqual(resetHome.body.data.meta.source, 'defaults');
+
+    const resetPublicHome = await requestJson(`http://${HOST}:${PORT}/api/hailin/home`);
+    assert.strictEqual(resetPublicHome.status, 200);
+    assert.notStrictEqual(resetPublicHome.body.data.notice, 'Admin edited home notice');
   } finally {
     await stopProcess(backend);
     fs.rmSync(storageDir, { recursive: true, force: true });

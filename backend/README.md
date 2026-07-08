@@ -77,6 +77,9 @@ Authorization: Bearer <ADMIN_TOKEN>
 
 - `GET /api/admin/session`
 - `GET /api/admin/summary`
+- `GET /api/admin/home-content`
+- `PUT /api/admin/home-content`
+- `POST /api/admin/home-content/reset`
 - `GET /api/admin/bookings`
 - `GET /api/admin/feedback`
 - `GET /api/admin/audit`

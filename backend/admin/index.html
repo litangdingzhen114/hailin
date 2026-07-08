@@ -20,6 +20,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h7v6H4V5Zm9 0h7v4h-7V5ZM4 13h7v6H4v-6Zm9-2h7v8h-7v-8Z"/></svg>
           总览
         </button>
+        <button class="nav-item" type="button" data-view="home-content">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4V5Z"/><path d="M8 9h8M8 13h5M16 17h.01"/></svg>
+          首页内容
+        </button>
         <button class="nav-item" type="button" data-view="bookings">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4.5 8.5h15M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg>
           预约管理
@@ -95,6 +99,39 @@
 
         <section class="content-grid">
           <section class="main-column">
+            <div class="panel" data-section="home-content">
+              <div class="panel-head">
+                <div>
+                  <h2>首页内容</h2>
+                  <p>轮播、入口、推荐区和首页公告</p>
+                </div>
+                <div class="panel-tools">
+                  <button id="homeContentFormat" class="ghost-button" type="button">格式化</button>
+                  <button id="homeContentReset" class="ghost-button" type="button">恢复默认</button>
+                  <button id="homeContentSave" class="primary-button" type="button">保存首页</button>
+                </div>
+              </div>
+              <div class="home-content-layout">
+                <section class="home-preview" aria-label="首页内容预览">
+                  <div class="home-meta">
+                    <span id="homeContentSource">-</span>
+                    <strong id="homeContentUpdated">-</strong>
+                  </div>
+                  <div class="home-stat-grid">
+                    <div><span>轮播</span><strong id="homeBannerCount">0</strong></div>
+                    <div><span>入口</span><strong id="homeGridCount">0</strong></div>
+                    <div><span>推荐</span><strong id="homeHotCount">0</strong></div>
+                    <div><span>游记</span><strong id="homeFeedCount">0</strong></div>
+                  </div>
+                  <div id="homePreviewList" class="home-preview-list"></div>
+                </section>
+                <label class="editor-block" for="homeContentEditor">
+                  <span>内容 JSON</span>
+                  <textarea id="homeContentEditor" class="code-editor" rows="24" spellcheck="false"></textarea>
+                </label>
+              </div>
+            </div>
+
             <div class="panel" data-section="bookings">
               <div class="panel-head">
                 <div>

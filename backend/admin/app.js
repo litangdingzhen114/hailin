@@ -36,6 +36,7 @@ const state = {
   latestBookings: [],
   latestFeedback: [],
   latestAudit: [],
+  homeContent: null,
   selectedBookings: new Set(),
   selectedFeedback: new Set(),
   detail: null
@@ -267,6 +268,94 @@ function renderAudit(items) {
   `).join('') : '<div class="feedback-content">暂无审计记录</div>';
 }
 
+function homeStats(content) {
+  return {
+    banners: (content.banners || []).length,
+    gridItems: (content.gridPages || []).reduce((total, page) => total + (Array.isArray(page.items) ? page.items.length : 0), 0),
+    hotRecommends: (content.hotRecommends || []).length,
+    feeds: (content.feeds || []).length
+  };
+}
+
+function renderHomeContent(payload) {
+  state.homeContent = payload;
+  const content = payload.content || {};
+  const meta = payload.meta || {};
+  const stats = meta.stats || homeStats(content);
+  const editor = $('#homeContentEditor');
+  if (document.activeElement !== editor) {
+    editor.value = JSON.stringify(content, null, 2);
+  }
+
+  $('#homeContentSource').textContent = meta.source === 'storage' ? '后台已保存' : '默认内容';
+  $('#homeContentUpdated').textContent = meta.updatedAt ? formatDate(meta.updatedAt) : '未修改';
+  $('#homeBannerCount').textContent = stats.banners || 0;
+  $('#homeGridCount').textContent = stats.gridItems || 0;
+  $('#homeHotCount').textContent = stats.hotRecommends || 0;
+  $('#homeFeedCount').textContent = stats.feeds || 0;
+
+  const previewItems = [
+    ...(content.banners || []).slice(0, 3).map((item) => ({ type: '轮播', title: item.title, meta: item.subtitle || item.tag })),
+    ...(content.hotRecommends || []).slice(0, 4).map((item) => ({ type: '推荐', title: item.title, meta: item.subtitle || item.buttonText }))
+  ];
+
+  $('#homePreviewList').innerHTML = previewItems.length ? previewItems.map((item) => `
+    <article class="home-preview-item">
+      <span>${escapeHtml(item.type)}</span>
+      <strong>${escapeHtml(item.title || '-')}</strong>
+      <small>${escapeHtml(item.meta || '-')}</small>
+    </article>
+  `).join('') : '<div class="recent-meta">暂无首页内容</div>';
+}
+
+function parseHomeEditor() {
+  try {
+    const parsed = JSON.parse($('#homeContentEditor').value || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('首页内容必须是 JSON 对象');
+    }
+    return parsed;
+  } catch (error) {
+    throw new Error(`JSON 格式错误：${error.message}`);
+  }
+}
+
+async function saveHomeContent() {
+  try {
+    const content = parseHomeEditor();
+    const payload = await api('/api/admin/home-content', {
+      method: 'PUT',
+      body: JSON.stringify({ content })
+    });
+    renderHomeContent(payload);
+    toast('首页内容已保存');
+    await loadDashboard();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function formatHomeContent() {
+  try {
+    $('#homeContentEditor').value = JSON.stringify(parseHomeEditor(), null, 2);
+    toast('格式化完成');
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function resetHomeContent() {
+  if (!window.confirm('恢复默认首页内容？')) return;
+  try {
+    const payload = await api('/api/admin/home-content/reset', { method: 'POST' });
+    renderHomeContent(payload);
+    toast('首页内容已恢复默认');
+    await loadDashboard();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
 function auditActionText(action) {
   return {
     'booking.created': '提交预约',
@@ -275,6 +364,8 @@ function auditActionText(action) {
     'feedback.status.updated': '更新反馈状态',
     'booking.bulk-status.updated': '批量处理预约',
     'feedback.bulk-status.updated': '批量处理反馈',
+    'home-content.updated': '更新首页内容',
+    'home-content.reset': '恢复默认首页',
     'bookings.csv.exported': '导出预约 CSV',
     'feedback.csv.exported': '导出反馈 CSV',
     'backup.exported': '下载完整备份'
@@ -295,14 +386,16 @@ function auditQueryString(search) {
 }
 
 async function loadDashboard() {
-  const [summary, bookings, feedback, audit] = await Promise.all([
+  const [summary, homeContent, bookings, feedback, audit] = await Promise.all([
     api('/api/admin/summary'),
+    api('/api/admin/home-content'),
     api(`/api/admin/bookings?${queryString(state.bookingStatus, state.bookingSearch)}`),
     api(`/api/admin/feedback?${queryString(state.feedbackStatus, state.feedbackSearch)}`),
     api(`/api/admin/audit?${auditQueryString(state.auditSearch)}`)
   ]);
   showApp();
   updateSummary(summary);
+  renderHomeContent(homeContent);
   renderBookings(bookings.items);
   renderFeedback(feedback.items);
   renderAudit(audit.items);
@@ -568,6 +661,9 @@ function bindEvents() {
   $('#exportBookings').addEventListener('click', () => exportData('bookings'));
   $('#exportFeedback').addEventListener('click', () => exportData('feedback'));
   $('#exportBackup').addEventListener('click', exportBackup);
+  $('#homeContentSave').addEventListener('click', saveHomeContent);
+  $('#homeContentFormat').addEventListener('click', formatHomeContent);
+  $('#homeContentReset').addEventListener('click', resetHomeContent);
   $('#quickBookingExport').addEventListener('click', () => exportData('bookings'));
   $('#quickFeedbackExport').addEventListener('click', () => exportData('feedback'));
   $('#quickBackupExport').addEventListener('click', exportBackup);
@@ -622,6 +718,7 @@ function bindEvents() {
       document.querySelectorAll('.nav-item').forEach((item) => item.classList.remove('is-active'));
       button.classList.add('is-active');
       const view = button.dataset.view;
+      if (view === 'home-content') document.querySelector('[data-section="home-content"]').scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (view === 'bookings') document.querySelector('[data-section="bookings"]').scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (view === 'feedback') document.querySelector('[data-section="feedback"]').scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (view === 'audit') document.querySelector('[data-section="audit"]').scrollIntoView({ behavior: 'smooth', block: 'start' });
