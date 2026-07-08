@@ -38,6 +38,7 @@ function createWxMock(platform, storageValue) {
   let api = loadApi(devWx);
   assert.strictEqual(api.resolveApiBaseUrl(), 'http://127.0.0.1:8787');
   assert.strictEqual(api.serviceModeText(), '本地后端已连接');
+  assert.strictEqual(api.mediaUrl('/media/hailin-live.mp4'), 'http://127.0.0.1:8787/media/hailin-live.mp4');
   assert.deepStrictEqual(await api.request('/api/check'), { ok: true });
   assert.strictEqual(devWx.lastRequest().url, 'http://127.0.0.1:8787/api/check');
 

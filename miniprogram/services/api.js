@@ -46,6 +46,12 @@ function joinUrl(baseUrl, endpoint) {
   return `${cleanBase}${cleanEndpoint}`;
 }
 
+function mediaUrl(pathname) {
+  const baseUrl = resolveApiBaseUrl();
+  if (!baseUrl) return '';
+  return joinUrl(baseUrl, pathname);
+}
+
 function normalizePayload(response) {
   if (!response) return null;
   if (response.data && response.data.data) return response.data.data;
@@ -94,6 +100,7 @@ function serviceModeText() {
 module.exports = {
   hasBackend,
   resolveApiBaseUrl,
+  mediaUrl,
   request,
   serviceModeText,
   serviceConfig

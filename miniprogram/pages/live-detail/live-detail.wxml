@@ -24,7 +24,7 @@
     </view>
     <view class="scan-line"></view>
     <view class="mock-play">▶</view>
-    <view class="mock-caption">未配置真实直播流 · 当前为本地封面</view>
+    <view class="mock-caption">视频源暂不可用 · 当前显示封面</view>
     <text class="mock-word">{{live.icon}}</text>
   </view>
 

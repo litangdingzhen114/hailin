@@ -1,4 +1,5 @@
 const { loadLives } = require('../../services/content');
+const { mediaUrl } = require('../../services/api');
 const recommend = require('../../data/recommend');
 const { findById, quickToast } = require('../../utils/mock');
 
@@ -15,6 +16,18 @@ const VIDEO_SOURCE_CANDIDATES = [
   PACKAGE_LIVE_VIDEO,
   PACKAGE_LIVE_VIDEO_FALLBACK
 ].filter(Boolean);
+const BACKEND_LIVE_VIDEO = mediaUrl('/media/hailin-live.mp4');
+
+function uniqueVideoSources(sources) {
+  return sources
+    .map((source) => String(source || '').trim())
+    .filter(Boolean)
+    .filter((source, index, list) => list.indexOf(source) === index);
+}
+
+function preferredLiveVideoUrl(live) {
+  return String((live && (live.hlsUrl || live.liveUrl)) || BACKEND_LIVE_VIDEO || '').trim();
+}
 
 Page({
   data: {
@@ -37,7 +50,7 @@ Page({
         live
       });
       if (live) {
-        this.prepareLocalVideo();
+        this.prepareVideo(live);
       }
     });
   },
@@ -57,6 +70,23 @@ Page({
     this.setData({
       currentTime: `${date} ${time}`
     });
+  },
+
+  prepareVideo(live) {
+    const remoteSource = preferredLiveVideoUrl(live);
+    this.videoSourceCandidates = uniqueVideoSources([
+      remoteSource,
+      USER_LIVE_VIDEO,
+      PACKAGE_LIVE_VIDEO,
+      PACKAGE_LIVE_VIDEO_FALLBACK
+    ]);
+
+    if (remoteSource) {
+      this.useVideoSource(remoteSource);
+      return;
+    }
+
+    this.prepareLocalVideo();
   },
 
   prepareLocalVideo() {
@@ -101,23 +131,25 @@ Page({
   },
 
   useVideoSource(source) {
-    this.videoSourceIndex = Math.max(0, VIDEO_SOURCE_CANDIDATES.indexOf(source));
+    const candidates = this.videoSourceCandidates && this.videoSourceCandidates.length ? this.videoSourceCandidates : VIDEO_SOURCE_CANDIDATES;
+    this.videoSourceIndex = Math.max(0, candidates.indexOf(source));
     this.setData({ videoUrl: source });
   },
 
   tryNextVideoSource() {
-    const currentIndex = VIDEO_SOURCE_CANDIDATES.indexOf(this.data.videoUrl);
+    const candidates = this.videoSourceCandidates && this.videoSourceCandidates.length ? this.videoSourceCandidates : VIDEO_SOURCE_CANDIDATES;
+    const currentIndex = candidates.indexOf(this.data.videoUrl);
     const nextIndex = Math.max(this.videoSourceIndex || 0, currentIndex) + 1;
-    const nextSource = VIDEO_SOURCE_CANDIDATES[nextIndex];
+    const nextSource = candidates[nextIndex];
     if (nextSource) {
       this.videoSourceIndex = nextIndex;
       this.setData({ videoUrl: nextSource });
       quickToast('正在切换备用视频源');
       return;
     }
-    this.videoSourceIndex = VIDEO_SOURCE_CANDIDATES.length;
+    this.videoSourceIndex = candidates.length;
     this.setData({ videoUrl: '' });
-    quickToast('视频暂不可播放，已切换为封面预览');
+    quickToast('视频源暂不可用，已切换为封面预览');
   },
 
   readPackageVideo(fs, index, onSuccess, onFail, lastError) {
@@ -143,7 +175,7 @@ Page({
       quickToast('正在播放海林实时视频');
       return;
     }
-    quickToast('未配置真实直播流，当前显示本地封面');
+    quickToast('视频源暂不可用，当前显示封面');
   },
 
   onVideoError(event) {
